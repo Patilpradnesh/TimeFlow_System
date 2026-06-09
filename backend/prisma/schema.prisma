@@ -1,0 +1,192 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id              String           @id @default(cuid())
+  email           String           @unique
+  name            String
+  password        String
+  industry        Industry         @default(GENERAL)
+  phoneNumber     String?
+  avatarUrl       String?
+  focusCredits    Int              @default(0)
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  tasks           Task[]
+  notes           Note[]
+  alarms          Alarm[]
+  goals           Goal[]
+  trackers        Tracker[]
+  flowGrid        FlowGrid?
+  behaviorProfile BehaviorProfile?
+  behaviorLogs    BehaviorLog[]
+}
+
+model BehaviorProfile {
+  id                  String   @id @default(cuid())
+  userId              String   @unique
+  user                User     @relation(fields: [userId], references: [id])
+  avgResponseTime     Float?
+  ignoreRate          Float?
+  preferredActiveHour Int?
+  totalTasksDone      Int      @default(0)
+  totalReminders      Int      @default(0)
+  updatedAt           DateTime @updatedAt
+}
+
+model BehaviorLog {
+  id                  String   @id @default(cuid())
+  userId              String
+  user                User     @relation(fields: [userId], references: [id])
+  taskId              String?
+  task                Task?    @relation(fields: [taskId], references: [id])
+  delayTimeSeconds    Int?     // How long they delayed execution
+  ignoreCount         Int      @default(0) // How many times they ignored reminders
+  completionSpeed     Int?     // How fast they finished it from start to finish
+  behaviorTypeDetected String? // Overthinker, Dopamine Seeker, etc.
+  createdAt           DateTime @default(now())
+}
+
+model Task {
+  id            String      @id @default(cuid())
+  title         String
+  description   String?
+  reason        String?     // The "Why" behind the task
+  microSteps    Json?       // AI-Ready: Sub-tasks
+  emotionalTone String?     // AI-Ready: How the user feels
+  status        TaskStatus  @default(TODO)
+  priority      Priority    @default(MEDIUM)
+  importance    Importance  @default(MEDIUM)
+  urgencyScore  Float?
+  dueDate       DateTime?
+  completedAt   DateTime?
+  isAlerted     Boolean     @default(false)
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  userId        String
+  user          User        @relation(fields: [userId], references: [id])
+  reminders     Reminder[]
+  behaviorLogs  BehaviorLog[]
+}
+
+model Reminder {
+  id          String       @id @default(cuid())
+  taskId      String
+  task        Task         @relation(fields: [taskId], references: [id])
+  level       Int          // Escalation level: 1, 2, 3, 4
+  scheduledAt DateTime
+  sentAt      DateTime?
+  isIgnored   Boolean      @default(false)
+  message     String
+  tone        ReminderTone
+}
+
+model Note {
+  id        String   @id @default(cuid())
+  title     String
+  content   Json
+  tags      String[]
+  isPinned  Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+}
+
+model Alarm {
+  id        String   @id @default(cuid())
+  time      String   // e.g., "07:30"
+  label     String?
+  days      String[] // ["MON", "WED"]
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+}
+
+model Goal {
+  id        String   @id @default(cuid())
+  title     String
+  progress  Int      @default(0)
+  horizon   Horizon  @default(WEEKLY)
+  createdAt DateTime @default(now())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+}
+
+model FlowGrid {
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  user      User     @relation(fields: [userId], references: [id])
+  tasks     Json     @default("[]")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+
+enum Industry {
+  TECH
+  HEALTH
+  BUSINESS
+  SCHOOL
+  COLLEGE
+  CREATIVE
+  FINANCE
+  SPORTS
+  GENERAL
+}
+
+enum TaskStatus {
+  TODO
+  IN_PROGRESS
+  ON_HOLD
+  DONE
+}
+
+enum Priority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum Importance {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum Horizon {
+  DAILY
+  WEEKLY
+  MONTHLY
+  YEARLY
+}
+
+model Tracker {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+  name        String
+  columns     Json     @default("[]")
+  rows        Json     @default("[]")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+enum ReminderTone {
+  GENTLE
+  ASSERTIVE
+  URGENT
+  CRITICAL
+}
