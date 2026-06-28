@@ -29,6 +29,10 @@ model User {
   flowGrid        FlowGrid?
   behaviorProfile BehaviorProfile?
   behaviorLogs    BehaviorLog[]
+  behaviorEvents  BehaviorEvent[]
+  executionSessions ExecutionSession[]
+  focusCreditLogs FocusCredit[]
+  privacyConsents PrivacyConsent[]
 }
 
 model BehaviorProfile {
@@ -43,17 +47,87 @@ model BehaviorProfile {
   updatedAt           DateTime @updatedAt
 }
 
+// Kept for backward compatibility, transitioning to BehaviorEvent
 model BehaviorLog {
   id                  String   @id @default(cuid())
   userId              String
   user                User     @relation(fields: [userId], references: [id])
   taskId              String?
   task                Task?    @relation(fields: [taskId], references: [id])
-  delayTimeSeconds    Int?     // How long they delayed execution
-  ignoreCount         Int      @default(0) // How many times they ignored reminders
-  completionSpeed     Int?     // How fast they finished it from start to finish
-  behaviorTypeDetected String? // Overthinker, Dopamine Seeker, etc.
+  delayTimeSeconds    Int?     
+  ignoreCount         Int      @default(0) 
+  completionSpeed     Int?     
+  behaviorTypeDetected String? 
   createdAt           DateTime @default(now())
+}
+
+model BehaviorEvent {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  taskId    String?
+  task      Task?    @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  type      EventType
+  metadata  Json?
+  timestamp DateTime @default(now())
+}
+
+model ExecutionSession {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  taskId    String
+  task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  startTime DateTime @default(now())
+  endTime   DateTime?
+  notes     String?
+}
+
+model FocusCredit {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  points    Int
+  reason    String
+  timestamp DateTime @default(now())
+}
+
+model PrivacyConsent {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  version   String
+  timestamp DateTime @default(now())
+}
+
+model AIInteraction {
+  id          String   @id @default(cuid())
+  type        AIType
+  inputData   Json
+  outputData  Json
+  timestamp   DateTime @default(now())
+}
+
+model Goal {
+  id          String   @id @default(cuid())
+  title       String
+  description String?
+  progress    Int      @default(0)
+  horizon     Horizon  @default(WEEKLY)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+  phases      Phase[]
+}
+
+model Phase {
+  id         String   @id @default(cuid())
+  goalId     String
+  goal       Goal     @relation(fields: [goalId], references: [id], onDelete: Cascade)
+  title      String
+  orderIndex Int
+  tasks      Task[]
 }
 
 model Task {
@@ -61,6 +135,7 @@ model Task {
   title         String
   description   String?
   reason        String?     // The "Why" behind the task
+  reasonForProcrastination ProcrastinationReason?
   microSteps    Json?       // AI-Ready: Sub-tasks
   emotionalTone String?     // AI-Ready: How the user feels
   status        TaskStatus  @default(TODO)
@@ -74,14 +149,18 @@ model Task {
   updatedAt     DateTime    @updatedAt
   userId        String
   user          User        @relation(fields: [userId], references: [id])
+  phaseId       String?
+  phase         Phase?      @relation(fields: [phaseId], references: [id])
   reminders     Reminder[]
   behaviorLogs  BehaviorLog[]
+  behaviorEvents BehaviorEvent[]
+  executionSessions ExecutionSession[]
 }
 
 model Reminder {
   id          String       @id @default(cuid())
   taskId      String
-  task        Task         @relation(fields: [taskId], references: [id])
+  task        Task         @relation(fields: [taskId], references: [id], onDelete: Cascade)
   level       Int          // Escalation level: 1, 2, 3, 4
   scheduledAt DateTime
   sentAt      DateTime?
@@ -113,16 +192,6 @@ model Alarm {
   user      User     @relation(fields: [userId], references: [id])
 }
 
-model Goal {
-  id        String   @id @default(cuid())
-  title     String
-  progress  Int      @default(0)
-  horizon   Horizon  @default(WEEKLY)
-  createdAt DateTime @default(now())
-  userId    String
-  user      User     @relation(fields: [userId], references: [id])
-}
-
 model FlowGrid {
   id        String   @id @default(cuid())
   userId    String   @unique
@@ -132,6 +201,16 @@ model FlowGrid {
   updatedAt DateTime @updatedAt
 }
 
+model Tracker {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+  name        String
+  columns     Json     @default("[]")
+  rows        Json     @default("[]")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
 
 enum Industry {
   TECH
@@ -173,20 +252,33 @@ enum Horizon {
   YEARLY
 }
 
-model Tracker {
-  id          String   @id @default(cuid())
-  userId      String
-  user        User     @relation(fields: [userId], references: [id])
-  name        String
-  columns     Json     @default("[]")
-  rows        Json     @default("[]")
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-}
-
 enum ReminderTone {
   GENTLE
   ASSERTIVE
   URGENT
   CRITICAL
+}
+
+enum EventType {
+  CREATED
+  STARTED
+  PAUSED
+  IGNORED
+  COMPLETED
+}
+
+enum ProcrastinationReason {
+  OVERWHELMED
+  FEAR_OF_FAILURE
+  UNCLEAR_START
+  LACK_OF_ENERGY
+  PERFECTIONISM
+  DISTRACTED
+  OTHER
+}
+
+enum AIType {
+  ROADMAP
+  MICROSTEP
+  REMINDER
 }

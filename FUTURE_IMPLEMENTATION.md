@@ -9,7 +9,8 @@
 ## 🏛️ System Architecture Principles
 
 1.  **Event-Driven Behavioral Logging:** Every interaction (start, ignore, delay, complete) is an immutable event.
-2.  **Modular AI Integration:** AI services (Micro-steps, Roadmap Generation, Adaptive Reminders) act as pure functions consuming behavioral state.
+2.  **Modular AI Integration:** AI services (Micro-steps, Roadmap Generation, Adaptive Reminders) act as pure functions consuming b
+ehavioral state.
 3.  **Real-Time State Sync:** WebSockets ensure the UI instantly reflects momentum changes and execution states.
 4.  **Clean Separation of Concerns:** Core infrastructure → Behavior Systems → AI Execution Layer → Analytics.
 

@@ -4,13 +4,11 @@ import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import { 
   Plus, CheckCircle2, Circle, Clock, 
-  Trash2, AlertCircle, Calendar, 
-  Target, Info, Loader2
+  Trash2, Target, Loader2, Play, Pause, FastForward
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { 
   Dialog, DialogContent, DialogDescription, 
   DialogFooter, DialogHeader, DialogTitle, DialogTrigger 
@@ -33,11 +31,12 @@ interface Task {
   title: string;
   description: string | null;
   reason: string | null;
-  status: 'TODO' | 'IN_PROGRESS' | 'DONE';
+  status: 'TODO' | 'IN_PROGRESS' | 'ON_HOLD' | 'DONE';
   priority: 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT';
   importance: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
   dueDate: string | null;
   microSteps?: MicroStep[];
+  reasonForProcrastination?: string | null;
 }
 
 export default function TasksPage() {
@@ -45,6 +44,14 @@ export default function TasksPage() {
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+
+  // Execution Session State
+  const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
+  const [activeTaskId, setActiveTaskId] = useState<string | null>(null);
+  
+  // Resistance Flow State
+  const [resistanceModalOpen, setResistanceModalOpen] = useState(false);
+  const [selectedReason, setSelectedReason] = useState("OTHER");
 
   const [newTask, setNewTask] = useState({
     title: "",
@@ -56,30 +63,6 @@ export default function TasksPage() {
     microSteps: [] as MicroStep[],
   });
   const [newStepTitle, setNewStepTitle] = useState("");
-
-  const addMicroStep = (e: React.MouseEvent | React.KeyboardEvent) => {
-    e.preventDefault();
-    if (!newStepTitle.trim()) return;
-    setNewTask({
-      ...newTask,
-      microSteps: [...newTask.microSteps, { id: Date.now().toString(), title: newStepTitle, isDone: false }]
-    });
-    setNewStepTitle("");
-  };
-
-  const removeMicroStep = (id: string) => {
-    setNewTask({
-      ...newTask,
-      microSteps: newTask.microSteps.filter(s => s.id !== id)
-    });
-  };
-
-  const updateMicroStepTitle = (id: string, newTitle: string) => {
-    setNewTask({
-      ...newTask,
-      microSteps: newTask.microSteps.map(s => s.id === id ? { ...s, title: newTitle } : s)
-    });
-  };
 
   const fetchTasks = async () => {
     try {
@@ -112,50 +95,59 @@ export default function TasksPage() {
     }
   };
 
-  const toggleStatus = async (task: Task) => {
-    const nextStatus = task.status === 'DONE' ? 'TODO' : 'DONE';
+  const startSession = async (task: Task) => {
     try {
-      const response = await api.put(`/tasks/${task.id}`, { status: nextStatus });
-      setTasks(tasks.map(t => t.id === task.id ? response.data : t));
-      toast.success(nextStatus === 'DONE' ? "Task completed!" : "Task reopened");
+      const response = await api.post("/behavior/session/start", { taskId: task.id });
+      setActiveSessionId(response.data.id);
+      setActiveTaskId(task.id);
+      
+      // Optimistic update
+      setTasks(tasks.map(t => t.id === task.id ? { ...t, status: 'IN_PROGRESS' } : t));
+      toast.success(`Started executing: ${task.title}`);
     } catch (error) {
-      toast.error("Update failed");
+      toast.error("Failed to start session");
     }
   };
 
-  const toggleMicroStep = async (task: Task, stepId: string) => {
-    if (!task.microSteps) return;
-    const updatedSteps = task.microSteps.map(step => 
-      step.id === stepId ? { ...step, isDone: !step.isDone } : step
-    );
-    
-    // Optimistic UI update
-    setTasks(tasks.map(t => t.id === task.id ? { ...t, microSteps: updatedSteps } : t));
-    
+  const completeSession = async () => {
+    if (!activeSessionId) return;
     try {
-      const response = await api.put(`/tasks/${task.id}`, { microSteps: updatedSteps });
-      setTasks(tasks.map(t => t.id === task.id ? response.data : t));
+      await api.post("/behavior/session/end", { 
+        sessionId: activeSessionId, 
+        completed: true 
+      });
+      
+      setTasks(tasks.map(t => t.id === activeTaskId ? { ...t, status: 'DONE' } : t));
+      setActiveSessionId(null);
+      setActiveTaskId(null);
+      toast.success("Session completed! +10 Focus Credits", {
+        icon: '💎'
+      });
     } catch (error) {
-      toast.error("Failed to update step");
-      // Revert optimism if failed
-      setTasks([...tasks]); 
+      toast.error("Failed to complete session");
     }
   };
 
-  const updateExistingMicroStepTitle = async (task: Task, stepId: string, newTitle: string) => {
-    if (!task.microSteps || !newTitle.trim() || newTitle === task.microSteps.find(s => s.id === stepId)?.title) return;
-    const updatedSteps = task.microSteps.map(step => 
-      step.id === stepId ? { ...step, title: newTitle } : step
-    );
-    
-    setTasks(tasks.map(t => t.id === task.id ? { ...t, microSteps: updatedSteps } : t));
-    
+  const pauseSession = () => {
+    setResistanceModalOpen(true);
+  };
+
+  const submitResistance = async () => {
+    if (!activeSessionId) return;
     try {
-      const response = await api.put(`/tasks/${task.id}`, { microSteps: updatedSteps });
-      setTasks(tasks.map(t => t.id === task.id ? response.data : t));
+      await api.post("/behavior/session/end", { 
+        sessionId: activeSessionId, 
+        completed: false,
+        procrastinationReason: selectedReason
+      });
+      
+      setTasks(tasks.map(t => t.id === activeTaskId ? { ...t, status: 'TODO', reasonForProcrastination: selectedReason } : t));
+      setActiveSessionId(null);
+      setActiveTaskId(null);
+      setResistanceModalOpen(false);
+      toast.info("Session paused. Momentum recorded.");
     } catch (error) {
-      toast.error("Failed to rename step");
-      fetchTasks();
+      toast.error("Failed to pause session");
     }
   };
 
@@ -171,11 +163,45 @@ export default function TasksPage() {
 
   return (
     <div className="space-y-8 animate-in fade-in duration-700">
+      {/* Resistance Flow Modal */}
+      <Dialog open={resistanceModalOpen} onOpenChange={setResistanceModalOpen}>
+        <DialogContent className="bg-slate-900 border-slate-800 text-white sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-bold flex items-center gap-2">
+              <Pause className="text-amber-500" /> Session Paused
+            </DialogTitle>
+            <DialogDescription className="text-slate-400">
+              Why are you delaying or pausing this task? This helps the AI adjust your workflow.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <Select onValueChange={setSelectedReason} defaultValue={selectedReason}>
+              <SelectTrigger className="bg-slate-950 border-slate-800">
+                <SelectValue placeholder="Select Resistance Reason" />
+              </SelectTrigger>
+              <SelectContent className="bg-slate-900 border-slate-800 text-white">
+                <SelectItem value="OVERWHELMED">I feel Overwhelmed</SelectItem>
+                <SelectItem value="FEAR_OF_FAILURE">Fear of Failure / Anxiety</SelectItem>
+                <SelectItem value="UNCLEAR_START">Unclear where to start</SelectItem>
+                <SelectItem value="LACK_OF_ENERGY">Lack of Energy / Burnout</SelectItem>
+                <SelectItem value="PERFECTIONISM">Perfectionism</SelectItem>
+                <SelectItem value="DISTRACTED">I got distracted</SelectItem>
+                <SelectItem value="OTHER">Other / Normal Break</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setResistanceModalOpen(false)}>Cancel</Button>
+            <Button onClick={submitResistance} className="bg-amber-600 hover:bg-amber-700">Log & Pause</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-4xl font-black tracking-tight text-white mb-2">Tasks</h1>
-          <p className="text-slate-500">Manage your daily execution flow.</p>
+          <h1 className="text-4xl font-black tracking-tight text-white mb-2">Execution Flow</h1>
+          <p className="text-slate-500">Pick a task. Start a session. Build momentum.</p>
         </div>
 
         <Dialog open={open} onOpenChange={setOpen}>
@@ -188,9 +214,6 @@ export default function TasksPage() {
             <form onSubmit={handleCreateTask}>
               <DialogHeader>
                 <DialogTitle className="text-xl font-bold">Create Task Intelligence</DialogTitle>
-                <DialogDescription className="text-slate-400">
-                  Add details to help the system prioritize this task.
-                </DialogDescription>
               </DialogHeader>
               <div className="space-y-4 py-4">
                 <div className="space-y-2">
@@ -214,68 +237,6 @@ export default function TasksPage() {
                     onChange={(e) => setNewTask({ ...newTask, reason: e.target.value })}
                   />
                 </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label className="text-slate-300">Priority</Label>
-                    <Select onValueChange={(v) => setNewTask({ ...newTask, priority: v })} defaultValue="MEDIUM">
-                      <SelectTrigger className="bg-slate-950 border-slate-800">
-                        <SelectValue placeholder="Priority" />
-                      </SelectTrigger>
-                      <SelectContent className="bg-slate-900 border-slate-800 text-white">
-                        <SelectItem value="LOW">Low</SelectItem>
-                        <SelectItem value="MEDIUM">Medium</SelectItem>
-                        <SelectItem value="HIGH">High</SelectItem>
-                        <SelectItem value="URGENT">Urgent</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label className="text-slate-300">Importance</Label>
-                    <Select onValueChange={(v) => setNewTask({ ...newTask, importance: v })} defaultValue="MEDIUM">
-                      <SelectTrigger className="bg-slate-950 border-slate-800">
-                        <SelectValue placeholder="Importance" />
-                      </SelectTrigger>
-                      <SelectContent className="bg-slate-900 border-slate-800 text-white">
-                        <SelectItem value="LOW">Low</SelectItem>
-                        <SelectItem value="MEDIUM">Medium</SelectItem>
-                        <SelectItem value="HIGH">High</SelectItem>
-                        <SelectItem value="CRITICAL">Critical</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-                
-                <div className="space-y-3 pt-4 mt-2 border-t border-slate-800">
-                  <Label className="text-slate-300">Micro-Steps (Break it down)</Label>
-                  <div className="flex gap-2">
-                    <Input 
-                      placeholder="e.g., Open code editor" 
-                      className="bg-slate-950 border-slate-800"
-                      value={newStepTitle}
-                      onChange={(e) => setNewStepTitle(e.target.value)}
-                      onKeyDown={(e) => e.key === 'Enter' && addMicroStep(e)}
-                    />
-                    <Button type="button" onClick={addMicroStep} variant="secondary" className="bg-slate-800 hover:bg-slate-700 text-white">
-                      Add
-                    </Button>
-                  </div>
-                  <div className="space-y-2 max-h-[150px] overflow-y-auto">
-                    {newTask.microSteps.map((step) => (
-                      <div key={step.id} className="flex items-center justify-between bg-slate-950 p-1 pl-3 rounded-md border border-slate-800 focus-within:border-slate-500 transition-colors">
-                        <input 
-                          type="text" 
-                          value={step.title}
-                          onChange={(e) => updateMicroStepTitle(step.id, e.target.value)}
-                          className="bg-transparent border-none outline-none text-sm text-slate-300 w-full"
-                        />
-                        <Button type="button" variant="ghost" size="sm" onClick={() => removeMicroStep(step.id)} className="h-8 w-8 shrink-0 text-slate-500 hover:text-red-400 hover:bg-transparent">
-                          <Trash2 size={14} />
-                        </Button>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
               </div>
               <DialogFooter>
                 <Button type="submit" disabled={submitting} className="w-full bg-blue-600 hover:bg-blue-700">
@@ -292,7 +253,7 @@ export default function TasksPage() {
         {loading ? (
           <div className="flex flex-col items-center justify-center py-20 space-y-4">
             <Loader2 className="animate-spin text-blue-500" size={40} />
-            <p className="text-slate-500">Synchronizing tasks with the engine...</p>
+            <p className="text-slate-500">Synchronizing behavioral data...</p>
           </div>
         ) : tasks.length === 0 ? (
           <Card className="bg-slate-900/50 border-slate-800 border-dashed py-20">
@@ -301,94 +262,99 @@ export default function TasksPage() {
                 <CheckCircle2 className="text-slate-800" size={32} />
               </div>
               <h3 className="text-xl font-bold text-slate-400">No tasks found</h3>
-              <p className="text-slate-500 max-w-xs mt-2">Create your first task to start the intelligent execution cycle.</p>
+              <p className="text-slate-500 max-w-xs mt-2">Create your first task to start the execution cycle.</p>
             </CardContent>
           </Card>
         ) : (
-          tasks.map((task) => (
-            <Card key={task.id} className={cn(
-              "bg-slate-900/50 border-slate-800 hover:border-slate-700 transition-all group overflow-hidden",
-              task.status === 'DONE' && "opacity-60"
-            )}>
-              <CardContent className="p-0 flex flex-col md:flex-row">
-                {/* Status Toggle Area */}
-                <button 
-                  onClick={() => toggleStatus(task)}
-                  className={cn(
-                    "md:w-16 flex items-center justify-center p-4 md:p-0 transition-colors",
-                    task.status === 'DONE' ? "bg-emerald-500/10 text-emerald-500" : "hover:bg-slate-900 text-slate-600 hover:text-white"
-                  )}
-                >
-                  {task.status === 'DONE' ? <CheckCircle2 size={24} /> : <Circle size={24} />}
-                </button>
-
-                {/* Content Area */}
-                <div className="flex-1 p-6 space-y-3">
-                  <div className="flex items-center gap-3 flex-wrap">
-                    <h3 className={cn(
-                      "text-lg font-bold text-white",
-                      task.status === 'DONE' && "line-through text-slate-500"
-                    )}>
-                      {task.title}
-                    </h3>
-                    <Badge variant="outline" className={cn(
-                      "border-0 px-2 h-5 text-[10px] uppercase font-black tracking-widest",
-                      getPriorityStyles(task.priority)
-                    )}>
-                      {task.priority}
-                    </Badge>
-                  </div>
+          tasks.map((task) => {
+            const isActive = activeTaskId === task.id;
+            return (
+              <Card key={task.id} className={cn(
+                "bg-slate-900/50 border-slate-800 hover:border-slate-700 transition-all group overflow-hidden",
+                task.status === 'DONE' && "opacity-50",
+                isActive && "border-blue-500/50 bg-blue-900/10 shadow-[0_0_30px_rgba(59,130,246,0.15)] ring-1 ring-blue-500"
+              )}>
+                <CardContent className="p-0 flex flex-col md:flex-row">
                   
-                  {task.reason && (
-                    <div className="flex items-center gap-2 text-slate-400 text-xs italic">
-                      <Target size={14} className="text-blue-500" />
-                      <span>{task.reason}</span>
-                    </div>
-                  )}
-
-                  {task.description && (
-                    <p className="text-sm text-slate-500 leading-relaxed">{task.description}</p>
-                  )}
-
-                  {task.microSteps && task.microSteps.length > 0 && (
-                    <div className="mt-4 space-y-2 bg-slate-950/50 p-3 rounded-lg border border-slate-800/50">
-                      {task.microSteps.map((step) => (
-                        <div key={step.id} className="flex items-center gap-2">
-                          <button 
-                            type="button"
-                            onClick={(e) => { e.stopPropagation(); toggleMicroStep(task, step.id); }}
-                            className={cn(
-                              "flex items-center justify-center w-5 h-5 rounded-full border transition-colors",
-                              step.isDone ? "bg-emerald-500/20 border-emerald-500/50 text-emerald-500" : "border-slate-700 hover:border-slate-500 bg-slate-900"
-                            )}
-                          >
-                            {step.isDone && <CheckCircle2 size={12} />}
-                          </button>
-                          <input 
-                            defaultValue={step.title}
-                            onBlur={(e) => updateExistingMicroStepTitle(task, step.id, e.target.value)}
-                            onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
-                            className={cn(
-                              "bg-transparent border-b border-transparent focus:border-slate-500 outline-none w-full text-sm transition-colors", 
-                              step.isDone ? "line-through text-slate-600" : "text-slate-300"
-                            )}
-                          />
+                  {/* Status / Play Button Area */}
+                  <div className="md:w-20 flex items-center justify-center p-4 md:p-0 bg-slate-950/30">
+                    {task.status === 'DONE' ? (
+                      <CheckCircle2 size={28} className="text-emerald-500" />
+                    ) : isActive ? (
+                      <div className="relative flex items-center justify-center w-12 h-12">
+                        <div className="absolute inset-0 border-2 border-blue-500 rounded-full animate-ping opacity-20"></div>
+                        <div className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center text-white animate-pulse">
+                          <Play size={18} className="ml-1" />
                         </div>
-                      ))}
+                      </div>
+                    ) : (
+                      <button 
+                        onClick={() => startSession(task)}
+                        disabled={activeTaskId !== null}
+                        className={cn(
+                          "w-10 h-10 rounded-full border border-slate-700 flex items-center justify-center transition-all",
+                          activeTaskId !== null ? "opacity-30 cursor-not-allowed" : "hover:bg-blue-600 hover:border-blue-600 hover:text-white text-slate-500"
+                        )}
+                      >
+                        <Play size={18} className="ml-1" />
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Content Area */}
+                  <div className="flex-1 p-6 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3 flex-wrap">
+                        <h3 className={cn(
+                          "text-lg font-bold text-white transition-all",
+                          isActive && "text-blue-400 text-xl",
+                          task.status === 'DONE' && "line-through text-slate-500"
+                        )}>
+                          {task.title}
+                        </h3>
+                        <Badge variant="outline" className={cn(
+                          "border-0 px-2 h-5 text-[10px] uppercase font-black tracking-widest",
+                          getPriorityStyles(task.priority)
+                        )}>
+                          {task.priority}
+                        </Badge>
+                        {task.reasonForProcrastination && (
+                          <Badge variant="outline" className="bg-amber-500/10 text-amber-500 border-0 text-[10px] uppercase">
+                            Stalled: {task.reasonForProcrastination.replace(/_/g, ' ')}
+                          </Badge>
+                        )}
+                      </div>
                     </div>
-                  )}
+                    
+                    {task.reason && (
+                      <div className="flex items-center gap-2 text-slate-400 text-xs italic">
+                        <Target size={14} className={isActive ? "text-blue-400" : "text-slate-600"} />
+                        <span>{task.reason}</span>
+                      </div>
+                    )}
+                  </div>
 
-                </div>
-
-                {/* Actions Area */}
-                <div className="flex md:flex-col items-center justify-center gap-2 p-4 md:p-6 border-t md:border-t-0 md:border-l border-slate-900 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <Button variant="ghost" size="icon" className="text-slate-500 hover:text-red-500 hover:bg-red-500/10" onClick={() => deleteTask(task.id)}>
-                    <Trash2 size={18} />
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          ))
+                  {/* Actions Area */}
+                  <div className="flex md:flex-col items-center justify-center gap-2 p-4 md:p-6 border-t md:border-t-0 md:border-l border-slate-900 bg-slate-950/20">
+                    {isActive ? (
+                      <>
+                        <Button variant="default" size="sm" onClick={completeSession} className="w-full bg-emerald-600 hover:bg-emerald-700">
+                          <CheckCircle2 size={16} className="mr-2" /> Complete
+                        </Button>
+                        <Button variant="outline" size="sm" onClick={pauseSession} className="w-full border-slate-700 hover:bg-slate-800 text-slate-300">
+                          <Pause size={16} className="mr-2" /> Pause
+                        </Button>
+                      </>
+                    ) : (
+                      <Button variant="ghost" size="icon" className="text-slate-600 hover:text-red-500 hover:bg-red-500/10" onClick={() => deleteTask(task.id)}>
+                        <Trash2 size={18} />
+                      </Button>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            )
+          })
         )}
       </div>
     </div>

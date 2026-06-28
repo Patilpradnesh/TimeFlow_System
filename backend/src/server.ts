@@ -12,6 +12,7 @@ import flowgridRoutes from './routes/flowgrid.routes.js';
 import alarmRoutes from './routes/alarm.routes.js';
 import goalRoutes from './routes/goal.routes.js';
 import trackerRoutes from './routes/tracker.routes.js';
+import behaviorRoutes from './routes/behavior.routes.js';
 import { initializeWhatsApp } from './utils/whatsapp.js';
 import { startBackgroundWorker } from './utils/worker.js';
 
@@ -45,6 +46,7 @@ app.use('/api/flowgrid', flowgridRoutes);
 app.use('/api/alarms', alarmRoutes);
 app.use('/api/goals', goalRoutes);
 app.use('/api/trackers', trackerRoutes);
+app.use('/api/behavior', behaviorRoutes);
 
 // Health Check Route
 app.get('/api/health', (req: Request, res: Response) => {
