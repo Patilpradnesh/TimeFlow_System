@@ -1,6 +1,54 @@
-node_modules
+# Dependencies
+node_modules/
+
+# Environment variables / secrets
 .env
-.next
-dist
-build
+.env.*
+!.env.example
+*.mdf
+
+# Next.js
+.next/
+out/
+
+# Build output
+dist/
+build/
+
+# TypeScript
+*.tsbuildinfo
+
+# OS files
 .DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+
+# Runtime / temporary files
+*.tmp
+*.temp
+
+# WhatsApp runtime data
+backend/.wwebjs_auth/
+backend/.wwebjs_cache/
+
+# Test / debug output
+backend/markdown_out.txt
+backend/prisma_gen_out.txt
+backend/prisma_push_out.txt
+backend/all_done.txt
+backend/e2e_cleanup.cjs
+backend/e2e_resume_test.cjs
+
+tsc_be.txt
+tsc_be_res.txt
+tsc_be_test.txt
+tsc_fe.txt
+
+#.mdfiles
+ AI_AGENT_PLAN.md/
+ TIMEFLOW_MASTER_DOCUMENT.md/
