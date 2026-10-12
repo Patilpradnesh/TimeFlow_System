@@ -1,9 +1,19 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
+import { env } from '../config/env.js';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'fallback_secret';
+const JWT_SECRET = env.JWT_SECRET;
 
-export const protect = async (req: Request, res: Response, next: NextFunction) => {
+// Augment Express Request to include userId
+declare global {
+  namespace Express {
+    interface Request {
+      userId?: string;
+    }
+  }
+}
+
+export const authenticate = async (req: Request, res: Response, next: NextFunction) => {
   try {
     let token;
 
@@ -19,7 +29,7 @@ export const protect = async (req: Request, res: Response, next: NextFunction) =
     const decoded = jwt.verify(token, JWT_SECRET) as { userId: string };
     
     // Attach user ID to the request object
-    (req as any).userId = decoded.userId;
+    req.userId = decoded.userId;
     
     next();
   } catch (error) {
@@ -27,3 +37,6 @@ export const protect = async (req: Request, res: Response, next: NextFunction) =
     res.status(401).json({ message: 'Not authorized, token failed' });
   }
 };
+
+// Alias so routes can import either name
+export const protect = authenticate;

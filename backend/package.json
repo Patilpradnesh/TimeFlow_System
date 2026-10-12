@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "tsx --watch src/server.ts",
+    "bot": "tsx whatsapp/index.ts",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
@@ -25,7 +26,8 @@
     "prisma": "^6.19.3",
     "qrcode-terminal": "^0.12.0",
     "socket.io": "^4.8.3",
-    "whatsapp-web.js": "^1.34.7"
+    "whatsapp-web.js": "^1.34.7",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@types/bcryptjs": "^2.4.6",

@@ -7,6 +7,10 @@ export const getTasks = async (req: Request, res: Response) => {
     const userId = (req as any).userId;
     const tasks = await prisma.task.findMany({
       where: { userId },
+      include: {
+        microSteps: true,
+        executionSessions: true,
+      },
       orderBy: { createdAt: 'desc' }
     });
     res.status(200).json(tasks);
@@ -17,7 +21,7 @@ export const getTasks = async (req: Request, res: Response) => {
 
 export const createTask = async (req: Request, res: Response) => {
   try {
-    const { title, description, reason, priority, importance, dueDate, microSteps } = req.body;
+    const { title, description, reason, priority, importance, dueDate, phaseId, microSteps } = req.body;
     const userId = (req as any).userId;
 
     const task = await prisma.task.create({
@@ -28,8 +32,17 @@ export const createTask = async (req: Request, res: Response) => {
         priority: priority || 'MEDIUM',
         importance: importance || 'MEDIUM',
         dueDate: dueDate ? new Date(dueDate) : null,
-        microSteps: microSteps || [],
-        userId
+        userId,
+        phaseId: phaseId || null,
+        microSteps: microSteps && microSteps.length > 0 ? {
+          create: microSteps.map((step: any) => ({
+            title: typeof step === 'string' ? step : step.title,
+            status: 'TODO'
+          }))
+        } : undefined
+      },
+      include: {
+        microSteps: true
       }
     });
 
@@ -43,7 +56,7 @@ export const createTask = async (req: Request, res: Response) => {
 export const updateTask = async (req: Request, res: Response) => {
   try {
     const id = req.params.id as string;
-    const { title, description, status, priority, importance, dueDate, microSteps } = req.body;
+    const { title, description, status, priority, importance, dueDate } = req.body;
     const userId = (req as any).userId;
 
     const task = await prisma.task.update({
@@ -55,8 +68,10 @@ export const updateTask = async (req: Request, res: Response) => {
         priority,
         importance,
         dueDate: dueDate ? new Date(dueDate) : undefined,
-        microSteps: microSteps !== undefined ? microSteps : undefined,
         completedAt: status === 'DONE' ? new Date() : null
+      },
+      include: {
+        microSteps: true
       }
     });
 

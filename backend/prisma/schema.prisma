@@ -25,6 +25,7 @@ model User {
   notes           Note[]
   alarms          Alarm[]
   goals           Goal[]
+  processes       Process[]
   trackers        Tracker[]
   flowGrid        FlowGrid?
   behaviorProfile BehaviorProfile?
@@ -33,6 +34,8 @@ model User {
   executionSessions ExecutionSession[]
   focusCreditLogs FocusCredit[]
   privacyConsents PrivacyConsent[]
+  jobApplications JobApplication[]
+  resumeFiles     ResumeFile[]
 }
 
 model BehaviorProfile {
@@ -73,14 +76,86 @@ model BehaviorEvent {
 }
 
 model ExecutionSession {
-  id        String   @id @default(cuid())
-  userId    String
-  user      User     @relation(fields: [userId], references: [id])
-  taskId    String
-  task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
-  startTime DateTime @default(now())
-  endTime   DateTime?
-  notes     String?
+  id               String            @id @default(cuid())
+  userId           String
+  user             User              @relation(fields: [userId], references: [id])
+  taskId           String
+  task             Task              @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  startTime        DateTime          @default(now())
+  endTime          DateTime?
+  notes            String?
+  
+  // Pivot Enhancements: Deep Behavioral Data
+  plannedDuration  Int?              // in minutes
+  actualDuration   Int?              // in minutes
+  focusRating      Int?              // 1-10 self reported
+  energyLevel      EnergyLevel?
+  difficulty       DifficultyLevel?
+  completionQuality Int?             // 1-10 self reported
+
+  // New EIE Relations (preparing for EIE)
+  progressUpdates  ProgressUpdate[]
+  reflections      Reflection[]
+  evidence         Evidence[]
+  evidenceScore    EvidenceScore?
+  evidenceEvents   EvidenceEvent[]
+}
+
+model Evidence {
+  id               String            @id @default(cuid())
+  sessionId        String
+  session          ExecutionSession  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  userId           String
+  taskId           String
+  type             EvidenceType      // Enum: PROGRESS, REFLECTION, ATTACHMENT
+  content          String?           // Text content or description
+  createdAt        DateTime          @default(now())
+  attachments      EvidenceAttachment[]
+}
+
+model EvidenceAttachment {
+  id               String            @id @default(cuid())
+  evidenceId       String
+  evidence         Evidence          @relation(fields: [evidenceId], references: [id], onDelete: Cascade)
+  fileUrl          String
+  mimeType         String
+  sizeBytes        Int
+  createdAt        DateTime          @default(now())
+}
+
+model ProgressUpdate {
+  id               String            @id @default(cuid())
+  sessionId        String
+  session          ExecutionSession  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  text             String
+  completedPercent Int?
+  createdAt        DateTime          @default(now())
+}
+
+model Reflection {
+  id               String            @id @default(cuid())
+  sessionId        String
+  session          ExecutionSession  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  text             String
+  emotionalState   String?
+  createdAt        DateTime          @default(now())
+}
+
+model EvidenceScore {
+  id               String            @id @default(cuid())
+  sessionId        String            @unique
+  session          ExecutionSession  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  confidenceScore  Float             // 0.0 to 100.0
+  aiAnalysis       Json              // Structured insights from the AI
+  lastCalculatedAt DateTime          @default(now())
+}
+
+model EvidenceEvent {
+  id               String            @id @default(cuid())
+  sessionId        String
+  session          ExecutionSession  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  eventType        String            // e.g., "UPLOAD_STARTED", "REFLECTION_SUBMITTED"
+  timestamp        DateTime          @default(now())
 }
 
 model FocusCredit {
@@ -118,13 +193,27 @@ model Goal {
   updatedAt   DateTime @updatedAt
   userId      String
   user        User     @relation(fields: [userId], references: [id])
+  processes   Process[]
+}
+
+model Process {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+  goalId      String?
+  goal        Goal?    @relation(fields: [goalId], references: [id], onDelete: Cascade)
+  title       String
+  description String?
+  templateId  String?  // If spawned from a Process Template
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
   phases      Phase[]
 }
 
 model Phase {
   id         String   @id @default(cuid())
-  goalId     String
-  goal       Goal     @relation(fields: [goalId], references: [id], onDelete: Cascade)
+  processId  String
+  process    Process  @relation(fields: [processId], references: [id], onDelete: Cascade)
   title      String
   orderIndex Int
   tasks      Task[]
@@ -136,7 +225,6 @@ model Task {
   description   String?
   reason        String?     // The "Why" behind the task
   reasonForProcrastination ProcrastinationReason?
-  microSteps    Json?       // AI-Ready: Sub-tasks
   emotionalTone String?     // AI-Ready: How the user feels
   status        TaskStatus  @default(TODO)
   priority      Priority    @default(MEDIUM)
@@ -151,10 +239,24 @@ model Task {
   user          User        @relation(fields: [userId], references: [id])
   phaseId       String?
   phase         Phase?      @relation(fields: [phaseId], references: [id])
+  
+  microSteps    MicroStep[]
   reminders     Reminder[]
   behaviorLogs  BehaviorLog[]
   behaviorEvents BehaviorEvent[]
   executionSessions ExecutionSession[]
+}
+
+model MicroStep {
+  id          String     @id @default(cuid())
+  taskId      String
+  task        Task       @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  title       String
+  orderIndex  Int        @default(0)
+  status      TaskStatus @default(TODO)
+  completedAt DateTime?
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
 }
 
 model Reminder {
@@ -187,6 +289,8 @@ model Alarm {
   label     String?
   days      String[] // ["MON", "WED"]
   isActive  Boolean  @default(true)
+  lastSentAt DateTime?
+
   createdAt DateTime @default(now())
   userId    String
   user      User     @relation(fields: [userId], references: [id])
@@ -210,6 +314,85 @@ model Tracker {
   rows        Json     @default("[]")
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// JOB APPLICATION TRACKER (Student Placement Module)
+// ═══════════════════════════════════════════════════════════════════
+// Students apply to many companies in parallel and lose track of three
+// things: which resume version they submitted, which stage each company
+// is at, and what they must study next.
+//
+// This model is the single source of truth for all three. It also drives
+// the real-time Kanban board (see socket events in src/lib/realtime.ts)
+// and the application funnel analytics (GET /api/job-applications/stats).
+model JobApplication {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // --- Core identity of the opportunity ---
+  companyName String
+  role        String
+  packageCtc  String? // Free-form String on purpose: "12 LPA", "18 LPA + ESOP", "₹45k/month"
+  jobLink     String? // Original posting URL
+
+  // --- Pipeline state ---
+  status          JobApplicationStatus @default(BOOKMARKED)
+  statusUpdatedAt DateTime? // When the card last entered this stage (powering "stuck for N days")
+  statusHistory   Json                 @default("[]") // Audit trail: [{ status, at }]
+
+  // --- Tracking metadata ---
+  applicationDate DateTime? // When it was actually submitted
+  resumeUsed      String? // e.g. "resume_backend_v2.pdf" - kills the "which resume did I send?" panic
+  resumeFileId    String? // The uploaded PDF/DOC/DOCX behind `resumeUsed` (see ResumeFile)
+  resumeFile      ResumeFile? @relation(fields: [resumeFileId], references: [id], onDelete: SetNull)
+  studyNotes      String? // Markdown: syllabus, company research, past interview questions
+
+  // --- Prioritisation ---
+  nextActionDate DateTime? // Next interview / deadline -> drives the 3-day alert badge
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Sorting a student's board is always "my jobs, by stage" or "my jobs, by next deadline"
+  @@index([userId, status])
+  @@index([userId, nextActionDate])
+  @@index([userId, createdAt])
+  @@index([resumeFileId])
+}
+
+/// A resume / CV the student actually uploaded (PDF, DOC or DOCX).
+///
+/// WHY THE BYTES LIVE IN POSTGRES: this project has no object-storage service
+/// (no S3 bucket, no multer uploads directory), so the file is stored as
+/// `bytea` right next to the row that references it. That keeps the feature
+/// dependency-free, makes "back up the database" equal "back up every resume",
+/// and means a download can never point at a file that a redeploy deleted.
+///
+/// The payload is accepted as base64 JSON (not multipart) because the server
+/// already allows a 50 MB JSON body, which avoids adding a multipart parser.
+/// Uploads are capped at MAX_RESUME_BYTES (8 MB) by the validator.
+///
+/// Downloads are streamed by GET /api/job-applications/resumes/:id, which
+/// checks ownership before touching `data`.
+model ResumeFile {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // --- Metadata (safe to select without pulling the blob) ---
+  fileName String // Original name, e.g. "resume_backend_v2.pdf"
+  mimeType String // application/pdf | application/msword | ...wordprocessingml.document
+  fileSize Int // Bytes — denormalised so listings never touch `data`
+  data     Bytes // The file itself
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  jobApplications JobApplication[]
+
+  @@index([userId, createdAt])
 }
 
 enum Industry {
@@ -272,13 +455,58 @@ enum ProcrastinationReason {
   FEAR_OF_FAILURE
   UNCLEAR_START
   LACK_OF_ENERGY
+  WAITING_FOR_SOMEONE
+  MISSING_INFORMATION
+  TOO_DIFFICULT
+  LOST_INTEREST
+  PERSONAL_ISSUE
+  HEALTH_ISSUE
+  CHANGED_PRIORITY
   PERFECTIONISM
   DISTRACTED
+  CUSTOM
   OTHER
+}
+
+enum EnergyLevel {
+  HIGH
+  MEDIUM
+  LOW
+  EXHAUSTED
+}
+
+enum DifficultyLevel {
+  TRIVIAL
+  EASY
+  MODERATE
+  HARD
+  EXTREME
+}
+
+enum EvidenceType {
+  PROGRESS
+  REFLECTION
+  ATTACHMENT
 }
 
 enum AIType {
   ROADMAP
   MICROSTEP
   REMINDER
+  REFLECTION
+  PROCESS
+  RECOVERY
+}
+
+/// Ordered pipeline stages for the student placement tracker.
+/// Declared in a deliberate order: index 0 = earliest, index 6 = offered.
+/// The frontend mirrors this list in src/lib/jobTracker.ts.
+enum JobApplicationStatus {
+  BOOKMARKED
+  APPLIED
+  ONLINE_ASSESSMENT
+  TECHNICAL_INTERVIEW
+  HR_INTERVIEW
+  OFFERED
+  REJECTED
 }

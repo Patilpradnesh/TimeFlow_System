@@ -26,13 +26,20 @@ export const SocketProvider = ({ children }: { children: ReactNode }) => {
     if (!user) return;
 
     const API_URL = process.env.NEXT_PUBLIC_API_URL?.replace('/api', '') || "http://localhost:5000";
-    const socketInstance = io(API_URL);
+    // The backend derives the user's private room from this verified JWT,
+    // so job/task updates can never leak between accounts.
+    const token = typeof window !== 'undefined' ? localStorage.getItem('timeflow_token') : null;
+
+    const socketInstance = io(API_URL, {
+      auth: { token },
+    });
 
     socketInstance.on("connect", () => {
       setIsConnected(true);
       console.log("🟢 Connected to Live Sync Engine");
       
-      // Optionally emit a join event with user ID to create personalized rooms
+      // Room membership is assigned server-side from the verified token.
+      // This emit is kept only for backward compatibility with older backends.
       if (user?.id) {
         socketInstance.emit("join-user-room", user.id);
       }

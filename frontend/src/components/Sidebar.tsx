@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import { 
   LayoutDashboard, CheckSquare, StickyNote, 
   AlarmClock, Target, Grid3X3, Settings, 
-  LogOut, Clock, BookOpen, Database
+  LogOut, Clock, BookOpen, Database, Briefcase
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/context/AuthContext";
@@ -16,6 +16,7 @@ const NAV_ITEMS = [
   { name: "Notes", href: "/notes", icon: StickyNote },
   { name: "Alarms", href: "/alarms", icon: AlarmClock },
   { name: "Goals", href: "/goals", icon: Target },
+  { name: "Job Tracker", href: "/job-tracker", icon: Briefcase },
   { name: "Trackers", href: "/trackers", icon: Database },
   { name: "FlowGrid", href: "/flowgrid", icon: Grid3X3 },
   { name: "Guide", href: "/guide", icon: BookOpen },
