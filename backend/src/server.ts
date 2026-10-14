@@ -17,7 +17,7 @@ import behaviorRoutes from './routes/behavior.routes.js';
 import processRoutes from './routes/process.routes.js';
 import eieRoutes from './routes/eie.routes.js';
 import jobApplicationRoutes from './routes/jobApplication.routes.js';
-import { startWhatsAppBot } from '../whatsapp/index.js';
+// import { startWhatsAppBot } from '../whatsapp/index.js';
 import { prisma } from './lib/prisma.js';
 import { registerRealtime } from './lib/realtime.js';
 
@@ -129,8 +129,8 @@ server.listen(PORT, () => {
     });
   });
 
-  // Start the Intelligent WhatsApp & Notification Bot
-  startWhatsAppBot().catch((err) => {
-    console.error('[whatsapp] Startup error:', err);
-  });
+  // // Start the Intelligent WhatsApp & Notification Bot
+  // startWhatsAppBot().catch((err) => {
+  //   console.error('[whatsapp] Startup error:', err);
+  // });
 });
