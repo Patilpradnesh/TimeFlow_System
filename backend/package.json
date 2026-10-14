@@ -4,10 +4,12 @@
   "main": "src/server.ts",
   "type": "module",
   "scripts": {
-    "dev": "tsx --watch src/server.ts",
-    "bot": "tsx whatsapp/index.ts",
-    "test": "echo \"Error: no test specified\" && exit 1"
-  },
+  "dev": "tsx --watch src/server.ts",
+  "bot": "tsx whatsapp/index.ts",
+  "build": "prisma generate && tsc",
+  "start": "node dist/src/server.js",
+  "test": "echo \"Error: no test specified\" && exit 1"
+},
   "keywords": [],
   "author": "",
   "license": "ISC",
