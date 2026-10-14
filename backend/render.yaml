@@ -1,0 +1,43 @@
+name: timeflow-backend
+instance_type: HUGGING_FACE_HUGGING_FACE_S3
+
+env:
+  - name: DATABASE_URL
+    value: "postgresql://user:password@db.your-org.render.com:5432/timeflow"
+  - name: JWT_SECRET
+    value: "your-jwt-secret-here"
+  - name: FRONTEND_URL
+    value: "https://your-username.your-org.vercel.app"
+  - name: PORT
+    value: "5000"
+  - name: WHATSAPP_ENABLED
+    value: "false"
+  - name: OPENAI_API_KEY
+    value: "your-openai-api-key"
+  - name: REDIS_URL
+    value: "redis://your-redis-url:6379"
+  - name: BULLMQ_REDIS_URL
+    value: "redis://your-redis-url:6379"
+  - name: NODE_ENV
+    value: "production"
+
+resources:
+  - type: ec2
+    properties:
+      instance_type: t3.small
+      vpc_id: "your-vpc-id"
+      subnet_id: "your-subnet-id"
+      security_group_ids:
+        - "sg-xxxxx"
+      user_data:
+        boto: """
+        #!/bin/bash
+        yum install -y python3-pip
+        pip3 install -U pip
+        pip3 install -U django
+        cd /home/ubuntu/timeflow-web-app/backend
+        git pull origin main
+        npx prisma generate
+        npm ci
+        npm start
+        """

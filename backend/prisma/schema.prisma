@@ -1,6 +1,3 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -11,264 +8,258 @@ datasource db {
 }
 
 model User {
-  id              String           @id @default(cuid())
-  email           String           @unique
-  name            String
-  password        String
-  industry        Industry         @default(GENERAL)
-  phoneNumber     String?
-  avatarUrl       String?
-  focusCredits    Int              @default(0)
-  createdAt       DateTime         @default(now())
-  updatedAt       DateTime         @updatedAt
-  tasks           Task[]
-  notes           Note[]
-  alarms          Alarm[]
-  goals           Goal[]
-  processes       Process[]
-  trackers        Tracker[]
-  flowGrid        FlowGrid?
-  behaviorProfile BehaviorProfile?
-  behaviorLogs    BehaviorLog[]
-  behaviorEvents  BehaviorEvent[]
+  id                String             @id @default(cuid())
+  email             String             @unique
+  name              String
+  password          String
+  industry          Industry           @default(GENERAL)
+  phoneNumber       String?
+  avatarUrl         String?
+  focusCredits      Int                @default(0)
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  alarms            Alarm[]
+  behaviorEvents    BehaviorEvent[]
+  behaviorLogs      BehaviorLog[]
+  behaviorProfile   BehaviorProfile?
   executionSessions ExecutionSession[]
-  focusCreditLogs FocusCredit[]
-  privacyConsents PrivacyConsent[]
-  jobApplications JobApplication[]
-  resumeFiles     ResumeFile[]
+  flowGrid          FlowGrid?
+  focusCreditLogs   FocusCredit[]
+  goals             Goal[]
+  jobApplications   JobApplication[]
+  notes             Note[]
+  privacyConsents   PrivacyConsent[]
+  processes         Process[]
+  resumeFiles       ResumeFile[]
+  tasks             Task[]
+  trackers          Tracker[]
 }
 
 model BehaviorProfile {
   id                  String   @id @default(cuid())
   userId              String   @unique
-  user                User     @relation(fields: [userId], references: [id])
   avgResponseTime     Float?
   ignoreRate          Float?
   preferredActiveHour Int?
   totalTasksDone      Int      @default(0)
   totalReminders      Int      @default(0)
   updatedAt           DateTime @updatedAt
+  user                User     @relation(fields: [userId], references: [id])
 }
 
-// Kept for backward compatibility, transitioning to BehaviorEvent
 model BehaviorLog {
-  id                  String   @id @default(cuid())
-  userId              String
-  user                User     @relation(fields: [userId], references: [id])
-  taskId              String?
-  task                Task?    @relation(fields: [taskId], references: [id])
-  delayTimeSeconds    Int?     
-  ignoreCount         Int      @default(0) 
-  completionSpeed     Int?     
-  behaviorTypeDetected String? 
-  createdAt           DateTime @default(now())
+  id                   String   @id @default(cuid())
+  userId               String
+  taskId               String?
+  delayTimeSeconds     Int?
+  ignoreCount          Int      @default(0)
+  completionSpeed      Int?
+  behaviorTypeDetected String?
+  createdAt            DateTime @default(now())
+  task                 Task?    @relation(fields: [taskId], references: [id])
+  user                 User     @relation(fields: [userId], references: [id])
 }
 
 model BehaviorEvent {
-  id        String   @id @default(cuid())
+  id        String    @id @default(cuid())
   userId    String
-  user      User     @relation(fields: [userId], references: [id])
   taskId    String?
-  task      Task?    @relation(fields: [taskId], references: [id], onDelete: Cascade)
   type      EventType
   metadata  Json?
-  timestamp DateTime @default(now())
+  timestamp DateTime  @default(now())
+  task      Task?     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id])
 }
 
 model ExecutionSession {
-  id               String            @id @default(cuid())
-  userId           String
-  user             User              @relation(fields: [userId], references: [id])
-  taskId           String
-  task             Task              @relation(fields: [taskId], references: [id], onDelete: Cascade)
-  startTime        DateTime          @default(now())
-  endTime          DateTime?
-  notes            String?
-  
-  // Pivot Enhancements: Deep Behavioral Data
-  plannedDuration  Int?              // in minutes
-  actualDuration   Int?              // in minutes
-  focusRating      Int?              // 1-10 self reported
-  energyLevel      EnergyLevel?
-  difficulty       DifficultyLevel?
-  completionQuality Int?             // 1-10 self reported
-
-  // New EIE Relations (preparing for EIE)
-  progressUpdates  ProgressUpdate[]
-  reflections      Reflection[]
-  evidence         Evidence[]
-  evidenceScore    EvidenceScore?
-  evidenceEvents   EvidenceEvent[]
+  id                String           @id @default(cuid())
+  userId            String
+  taskId            String
+  startTime         DateTime         @default(now())
+  endTime           DateTime?
+  notes             String?
+  plannedDuration   Int?
+  actualDuration    Int?
+  focusRating       Int?
+  energyLevel       EnergyLevel?
+  difficulty        DifficultyLevel?
+  completionQuality Int?
+  evidence          Evidence[]
+  evidenceEvents    EvidenceEvent[]
+  evidenceScore     EvidenceScore?
+  task              Task             @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  user              User             @relation(fields: [userId], references: [id])
+  progressUpdates   ProgressUpdate[]
+  reflections       Reflection[]
 }
 
 model Evidence {
-  id               String            @id @default(cuid())
-  sessionId        String
-  session          ExecutionSession  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
-  userId           String
-  taskId           String
-  type             EvidenceType      // Enum: PROGRESS, REFLECTION, ATTACHMENT
-  content          String?           // Text content or description
-  createdAt        DateTime          @default(now())
-  attachments      EvidenceAttachment[]
+  id          String               @id @default(cuid())
+  sessionId   String
+  userId      String
+  taskId      String
+  type        EvidenceType
+  content     String?
+  createdAt   DateTime             @default(now())
+  session     ExecutionSession     @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  attachments EvidenceAttachment[]
 }
 
 model EvidenceAttachment {
-  id               String            @id @default(cuid())
-  evidenceId       String
-  evidence         Evidence          @relation(fields: [evidenceId], references: [id], onDelete: Cascade)
-  fileUrl          String
-  mimeType         String
-  sizeBytes        Int
-  createdAt        DateTime          @default(now())
+  id         String   @id @default(cuid())
+  evidenceId String
+  fileUrl    String
+  mimeType   String
+  sizeBytes  Int
+  createdAt  DateTime @default(now())
+  evidence   Evidence @relation(fields: [evidenceId], references: [id], onDelete: Cascade)
 }
 
 model ProgressUpdate {
-  id               String            @id @default(cuid())
+  id               String           @id @default(cuid())
   sessionId        String
-  session          ExecutionSession  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
   text             String
   completedPercent Int?
-  createdAt        DateTime          @default(now())
+  createdAt        DateTime         @default(now())
+  session          ExecutionSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
 }
 
 model Reflection {
-  id               String            @id @default(cuid())
-  sessionId        String
-  session          ExecutionSession  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
-  text             String
-  emotionalState   String?
-  createdAt        DateTime          @default(now())
+  id             String           @id @default(cuid())
+  sessionId      String
+  text           String
+  emotionalState String?
+  createdAt      DateTime         @default(now())
+  session        ExecutionSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
 }
 
 model EvidenceScore {
-  id               String            @id @default(cuid())
-  sessionId        String            @unique
-  session          ExecutionSession  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
-  confidenceScore  Float             // 0.0 to 100.0
-  aiAnalysis       Json              // Structured insights from the AI
-  lastCalculatedAt DateTime          @default(now())
+  id               String           @id @default(cuid())
+  sessionId        String           @unique
+  confidenceScore  Float
+  aiAnalysis       Json
+  lastCalculatedAt DateTime         @default(now())
+  session          ExecutionSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
 }
 
 model EvidenceEvent {
-  id               String            @id @default(cuid())
-  sessionId        String
-  session          ExecutionSession  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
-  eventType        String            // e.g., "UPLOAD_STARTED", "REFLECTION_SUBMITTED"
-  timestamp        DateTime          @default(now())
+  id        String           @id @default(cuid())
+  sessionId String
+  eventType String
+  timestamp DateTime         @default(now())
+  session   ExecutionSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
 }
 
 model FocusCredit {
   id        String   @id @default(cuid())
   userId    String
-  user      User     @relation(fields: [userId], references: [id])
   points    Int
   reason    String
   timestamp DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id])
 }
 
 model PrivacyConsent {
   id        String   @id @default(cuid())
   userId    String
-  user      User     @relation(fields: [userId], references: [id])
   version   String
   timestamp DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id])
 }
 
 model AIInteraction {
-  id          String   @id @default(cuid())
-  type        AIType
-  inputData   Json
-  outputData  Json
-  timestamp   DateTime @default(now())
+  id         String   @id @default(cuid())
+  type       AIType
+  inputData  Json
+  outputData Json
+  timestamp  DateTime @default(now())
 }
 
 model Goal {
-  id          String   @id @default(cuid())
+  id          String    @id @default(cuid())
   title       String
   description String?
-  progress    Int      @default(0)
-  horizon     Horizon  @default(WEEKLY)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  progress    Int       @default(0)
+  horizon     Horizon   @default(WEEKLY)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
   userId      String
-  user        User     @relation(fields: [userId], references: [id])
+  user        User      @relation(fields: [userId], references: [id])
   processes   Process[]
 }
 
 model Process {
   id          String   @id @default(cuid())
   userId      String
-  user        User     @relation(fields: [userId], references: [id])
   goalId      String?
-  goal        Goal?    @relation(fields: [goalId], references: [id], onDelete: Cascade)
   title       String
   description String?
-  templateId  String?  // If spawned from a Process Template
+  templateId  String?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
   phases      Phase[]
+  goal        Goal?    @relation(fields: [goalId], references: [id], onDelete: Cascade)
+  user        User     @relation(fields: [userId], references: [id])
 }
 
 model Phase {
-  id         String   @id @default(cuid())
+  id         String  @id @default(cuid())
   processId  String
-  process    Process  @relation(fields: [processId], references: [id], onDelete: Cascade)
   title      String
   orderIndex Int
+  process    Process @relation(fields: [processId], references: [id], onDelete: Cascade)
   tasks      Task[]
 }
 
 model Task {
-  id            String      @id @default(cuid())
-  title         String
-  description   String?
-  reason        String?     // The "Why" behind the task
+  id                       String                 @id @default(cuid())
+  title                    String
+  description              String?
+  reason                   String?
   reasonForProcrastination ProcrastinationReason?
-  emotionalTone String?     // AI-Ready: How the user feels
-  status        TaskStatus  @default(TODO)
-  priority      Priority    @default(MEDIUM)
-  importance    Importance  @default(MEDIUM)
-  urgencyScore  Float?
-  dueDate       DateTime?
-  completedAt   DateTime?
-  isAlerted     Boolean     @default(false)
-  createdAt     DateTime    @default(now())
-  updatedAt     DateTime    @updatedAt
-  userId        String
-  user          User        @relation(fields: [userId], references: [id])
-  phaseId       String?
-  phase         Phase?      @relation(fields: [phaseId], references: [id])
-  
-  microSteps    MicroStep[]
-  reminders     Reminder[]
-  behaviorLogs  BehaviorLog[]
-  behaviorEvents BehaviorEvent[]
-  executionSessions ExecutionSession[]
+  emotionalTone            String?
+  status                   TaskStatus             @default(TODO)
+  priority                 Priority               @default(MEDIUM)
+  importance               Importance             @default(MEDIUM)
+  urgencyScore             Float?
+  dueDate                  DateTime?
+  completedAt              DateTime?
+  isAlerted                Boolean                @default(false)
+  createdAt                DateTime               @default(now())
+  updatedAt                DateTime               @updatedAt
+  userId                   String
+  phaseId                  String?
+  behaviorEvents           BehaviorEvent[]
+  behaviorLogs             BehaviorLog[]
+  executionSessions        ExecutionSession[]
+  microSteps               MicroStep[]
+  reminders                Reminder[]
+  phase                    Phase?                 @relation(fields: [phaseId], references: [id])
+  user                     User                   @relation(fields: [userId], references: [id])
 }
 
 model MicroStep {
   id          String     @id @default(cuid())
   taskId      String
-  task        Task       @relation(fields: [taskId], references: [id], onDelete: Cascade)
   title       String
   orderIndex  Int        @default(0)
   status      TaskStatus @default(TODO)
   completedAt DateTime?
   createdAt   DateTime   @default(now())
   updatedAt   DateTime   @updatedAt
+  task        Task       @relation(fields: [taskId], references: [id], onDelete: Cascade)
 }
 
 model Reminder {
   id          String       @id @default(cuid())
   taskId      String
-  task        Task         @relation(fields: [taskId], references: [id], onDelete: Cascade)
-  level       Int          // Escalation level: 1, 2, 3, 4
+  level       Int
   scheduledAt DateTime
   sentAt      DateTime?
   isIgnored   Boolean      @default(false)
   message     String
   tone        ReminderTone
+  task        Task         @relation(fields: [taskId], references: [id], onDelete: Cascade)
 }
 
 model Note {
@@ -284,78 +275,57 @@ model Note {
 }
 
 model Alarm {
-  id        String   @id @default(cuid())
-  time      String   // e.g., "07:30"
-  label     String?
-  days      String[] // ["MON", "WED"]
-  isActive  Boolean  @default(true)
+  id         String    @id @default(cuid())
+  time       String
+  label      String?
+  days       String[]
+  isActive   Boolean   @default(true)
+  createdAt  DateTime  @default(now())
+  userId     String
   lastSentAt DateTime?
-
-  createdAt DateTime @default(now())
-  userId    String
-  user      User     @relation(fields: [userId], references: [id])
+  user       User      @relation(fields: [userId], references: [id])
 }
 
 model FlowGrid {
   id        String   @id @default(cuid())
   userId    String   @unique
-  user      User     @relation(fields: [userId], references: [id])
   tasks     Json     @default("[]")
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id])
 }
 
 model Tracker {
-  id          String   @id @default(cuid())
-  userId      String
-  user        User     @relation(fields: [userId], references: [id])
-  name        String
-  columns     Json     @default("[]")
-  rows        Json     @default("[]")
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-}
-
-// ═══════════════════════════════════════════════════════════════════
-// JOB APPLICATION TRACKER (Student Placement Module)
-// ═══════════════════════════════════════════════════════════════════
-// Students apply to many companies in parallel and lose track of three
-// things: which resume version they submitted, which stage each company
-// is at, and what they must study next.
-//
-// This model is the single source of truth for all three. It also drives
-// the real-time Kanban board (see socket events in src/lib/realtime.ts)
-// and the application funnel analytics (GET /api/job-applications/stats).
-model JobApplication {
-  id     String @id @default(cuid())
-  userId String
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  // --- Core identity of the opportunity ---
-  companyName String
-  role        String
-  packageCtc  String? // Free-form String on purpose: "12 LPA", "18 LPA + ESOP", "₹45k/month"
-  jobLink     String? // Original posting URL
-
-  // --- Pipeline state ---
-  status          JobApplicationStatus @default(BOOKMARKED)
-  statusUpdatedAt DateTime? // When the card last entered this stage (powering "stuck for N days")
-  statusHistory   Json                 @default("[]") // Audit trail: [{ status, at }]
-
-  // --- Tracking metadata ---
-  applicationDate DateTime? // When it was actually submitted
-  resumeUsed      String? // e.g. "resume_backend_v2.pdf" - kills the "which resume did I send?" panic
-  resumeFileId    String? // The uploaded PDF/DOC/DOCX behind `resumeUsed` (see ResumeFile)
-  resumeFile      ResumeFile? @relation(fields: [resumeFileId], references: [id], onDelete: SetNull)
-  studyNotes      String? // Markdown: syllabus, company research, past interview questions
-
-  // --- Prioritisation ---
-  nextActionDate DateTime? // Next interview / deadline -> drives the 3-day alert badge
-
+  id        String   @id @default(cuid())
+  userId    String
+  name      String
+  columns   Json     @default("[]")
+  rows      Json     @default("[]")
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id])
+}
 
-  // Sorting a student's board is always "my jobs, by stage" or "my jobs, by next deadline"
+model JobApplication {
+  id              String               @id @default(cuid())
+  userId          String
+  companyName     String
+  role            String
+  packageCtc      String?
+  jobLink         String?
+  status          JobApplicationStatus @default(BOOKMARKED)
+  statusUpdatedAt DateTime?
+  statusHistory   Json                 @default("[]")
+  applicationDate DateTime?
+  resumeUsed      String?
+  studyNotes      String?
+  nextActionDate  DateTime?
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
+  resumeFileId    String?
+  resumeFile      ResumeFile?          @relation(fields: [resumeFileId], references: [id])
+  user            User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+
   @@index([userId, status])
   @@index([userId, nextActionDate])
   @@index([userId, createdAt])
@@ -377,20 +347,16 @@ model JobApplication {
 /// Downloads are streamed by GET /api/job-applications/resumes/:id, which
 /// checks ownership before touching `data`.
 model ResumeFile {
-  id     String @id @default(cuid())
-  userId String
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  // --- Metadata (safe to select without pulling the blob) ---
-  fileName String // Original name, e.g. "resume_backend_v2.pdf"
-  mimeType String // application/pdf | application/msword | ...wordprocessingml.document
-  fileSize Int // Bytes — denormalised so listings never touch `data`
-  data     Bytes // The file itself
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
+  id              String           @id @default(cuid())
+  userId          String
+  fileName        String
+  mimeType        String
+  fileSize        Int
+  data            Bytes
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
   jobApplications JobApplication[]
+  user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, createdAt])
 }
